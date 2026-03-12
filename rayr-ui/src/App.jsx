@@ -75,7 +75,7 @@ const GS = () => (
    TOAST
 ═══════════════════════════════════════════════════════ */
 let _toast = () => {};
-export const toast = (msg, type = "info") => _toast(msg, type);
+const toast = (msg, type = "info") => _toast(msg, type);
 const Toasts = () => {
   const [list, setList] = useState([]);
   _toast = (msg, type) => {
@@ -94,8 +94,28 @@ const Toasts = () => {
 };
 
 /* ═══════════════════════════════════════════════════════
-   LOCAL STORAGE
+   ERROR BOUNDARY — catches crashes, shows friendly message
 ═══════════════════════════════════════════════════════ */
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { err: null }; }
+  static getDerivedStateFromError(e) { return { err: e }; }
+  render() {
+    if (this.state.err) {
+      return (
+        <div style={{padding:40,textAlign:"center",fontFamily:"'Outfit',sans-serif"}}>
+          <div style={{fontSize:32,marginBottom:12}}>⚠️</div>
+          <div style={{fontSize:18,color:"#E4E8F2",marginBottom:8}}>Something went wrong</div>
+          <div style={{fontSize:12,color:"#7A8BA8",marginBottom:20}}>{this.state.err.message}</div>
+          <button onClick={()=>{ this.setState({err:null}); window.location.reload(); }}
+            style={{background:"#D4A755",border:"none",borderRadius:9,padding:"10px 24px",fontSize:13,fontWeight:600,color:"#06080F",cursor:"pointer",fontFamily:"'Outfit',sans-serif"}}>
+            Reload RAYR
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 const LS = {
   get: (k, def) => { try { const v = localStorage.getItem("rayr_" + k); return v ? JSON.parse(v) : def; } catch { return def; } },
   set: (k, v) => { try { localStorage.setItem("rayr_" + k, JSON.stringify(v)); } catch {} },
@@ -194,9 +214,19 @@ function buildPortfolio(holdings, sip) {
     ...h, value: parseFloat(h.value) || 0,
     weight: +((parseFloat(h.value) || 0) / total * 100).toFixed(1),
     expRatio: parseFloat(h.expRatio) || 0,
+    buyPrice: parseFloat(h.buyPrice) || 0,
+    units: parseFloat(h.units) || 0,
+    purchaseDate: h.purchaseDate || null,
     schemeCode: h.schemeCode || null,
     liveNav: h.liveNav || null,
   }));
+  // Gain: use actual buy price if available, else show N/A
+  const hasRealCost = rows.some(h => h.buyPrice > 0 && h.units > 0);
+  const totalCost = hasRealCost
+    ? rows.reduce((s,h) => s + (h.buyPrice > 0 && h.units > 0 ? h.buyPrice * h.units : h.value), 0)
+    : null;
+  const gain = totalCost ? total - totalCost : null;
+  const gainPct = totalCost ? +((gain / totalCost) * 100).toFixed(1) : null;
   const secMap = {};
   rows.forEach(h => { const k = h.sector || "Other"; secMap[k] = +(((secMap[k] || 0) + h.weight)).toFixed(1); });
   const sectorData = Object.entries(secMap).map(([name, v]) => ({ name, value: +v })).sort((a, b) => b.value - a.value);
@@ -250,7 +280,7 @@ function buildPortfolio(holdings, sip) {
   if (nS < 4) recs.push({ p:"Medium", action:"Add more sectors", detail:`Only ${nS} sector(s). A single sector event moves your entire portfolio. Target 5–7 distinct sectors.`, impact:"Lower sector risk" });
   if (avgEx > 1.0) recs.push({ p:"Low", action:"Switch to direct plans", detail:`Blended expense ratio: ${avgEx.toFixed(2)}%. Direct plans are 0.5–0.7% cheaper. On ₹${Math.round(total/100000).toFixed(0)}L portfolio that is real money.`, impact:`~₹${Math.round(total*(avgEx-0.75)/100).toLocaleString("en-IN")}/yr saved` });
   if (recs.length === 0) recs.push({ p:"Good", action:"Portfolio is well-structured", detail:"You have good diversification, a debt cushion, and reasonable costs. Keep SIPs running and review annually.", impact:"Stay the course" });
-  return { rows, total, invested:+(total*0.85).toFixed(0), gain:+(total*0.15).toFixed(0), gainPct:15.0, healthScore:sc, healthLabel, sectorData, assetData, sipData, projData, stressData, radarData, recs, nH, avgEx, hasD, maxW, isDemo:false };
+  return { rows, total, invested: totalCost ? +totalCost.toFixed(0) : null, gain, gainPct, hasRealCost, healthScore:sc, healthLabel, sectorData, assetData, sipData, projData, stressData, radarData, recs, nH, avgEx, hasD, maxW, isDemo:false };
 }
 
 /* Demo portfolio */
@@ -266,7 +296,7 @@ const DEMO_P = (() => {
     {name:"Reliance Industries",type:"Stock",value:46000,sector:"Energy",expRatio:0},
   ];
   const p = buildPortfolio(h, 25000);
-  return { ...p, total:847250, gain:122750, gainPct:16.9, healthScore:72, healthLabel:"Good", isDemo:true };
+  return { ...p, total:847250, invested:724500, gain:122750, gainPct:16.9, hasRealCost:true, healthScore:72, healthLabel:"Good", isDemo:true };
 })();
 
 /* ═══════════════════════════════════════════════════════
@@ -391,7 +421,7 @@ const Onboarding = ({ onDone }) => {
   const [age,  setAge]  = useState("");
   const [risk, setRisk] = useState("Moderate");
   const [sip,  setSip]  = useState("");
-  const BLANK = { name:"",type:"MF",value:"",sector:"",expRatio:"",schemeCode:null,liveNav:null };
+  const BLANK = { name:"",type:"MF",value:"",sector:"",expRatio:"",units:"",buyPrice:"",purchaseDate:"",schemeCode:null,liveNav:null };
   const [rows, setRows] = useState([{...BLANK},{...BLANK}]);
   const [navLoading, setNavLoading] = useState({});
 
@@ -514,15 +544,15 @@ const Onboarding = ({ onDone }) => {
               </div>
 
               {/* Table header */}
-              <div style={{display:"grid",gridTemplateColumns:"2fr 0.7fr 1fr 1.1fr 0.65fr 22px",gap:6,marginBottom:6,paddingBottom:6,borderBottom:`1px solid ${C.border}`}}>
-                {["Fund / Stock","Type","Value (₹)","Sector","Exp %",""].map(h => (
+              <div style={{display:"grid",gridTemplateColumns:"2fr 0.6fr 0.9fr 0.9fr 0.8fr 0.9fr 0.6fr 22px",gap:6,marginBottom:6,paddingBottom:6,borderBottom:`1px solid ${C.border}`}}>
+                {["Fund / Stock","Type","Curr. Value","Buy Price","Units","Sector","Exp %",""].map(h => (
                   <div key={h} style={{fontSize:9,color:C.textDim,letterSpacing:"0.06em",textTransform:"uppercase"}}>{h}</div>
                 ))}
               </div>
 
-              <div style={{maxHeight:260,overflowY:"auto",marginBottom:10}}>
+              <div style={{maxHeight:280,overflowY:"auto",marginBottom:10}}>
                 {rows.map((row, i) => (
-                  <div key={i} style={{display:"grid",gridTemplateColumns:"2fr 0.7fr 1fr 1.1fr 0.65fr 22px",gap:6,marginBottom:7,alignItems:"center"}}>
+                  <div key={i} style={{display:"grid",gridTemplateColumns:"2fr 0.6fr 0.9fr 0.9fr 0.8fr 0.9fr 0.6fr 22px",gap:6,marginBottom:9,alignItems:"start"}}>
                     <div style={{position:"relative"}}>
                       <FundSearch
                         value={row.name}
@@ -532,25 +562,36 @@ const Onboarding = ({ onDone }) => {
                         style={{padding:"8px 10px",fontSize:12}}
                       />
                       {navLoading[i] && <div style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",width:12,height:12,border:`2px solid ${C.gold}`,borderTopColor:"transparent",borderRadius:"50%",animation:"spin 0.7s linear infinite"}}/>}
-                      {row.liveNav && <div style={{fontSize:9,color:C.teal,marginTop:2}}>NAV: ₹{row.liveNav} ✓</div>}
+                      {row.liveNav && <div style={{fontSize:9,color:C.teal,marginTop:2}}>Live NAV ₹{row.liveNav} ✓</div>}
                     </div>
-                    <select style={{background:"#0A0F1C",border:"1px solid #1E2D45",borderRadius:8,padding:"8px 5px",fontSize:11,color:C.text,cursor:"pointer",fontFamily:"'Outfit',sans-serif"}} value={row.type} onChange={e=>upd(i,"type",e.target.value)}>
+                    <select style={{background:"#0A0F1C",border:"1px solid #1E2D45",borderRadius:8,padding:"8px 4px",fontSize:11,color:C.text,cursor:"pointer",fontFamily:"'Outfit',sans-serif"}} value={row.type} onChange={e=>upd(i,"type",e.target.value)}>
                       {TYPES.map(t=><option key={t} value={t}>{t}</option>)}
                     </select>
-                    <input style={{background:"#0A0F1C",border:"1px solid #1E2D45",borderRadius:8,padding:"8px 9px",fontSize:12,color:C.text,fontFamily:"'Outfit',sans-serif",width:"100%"}} placeholder="182000" type="number" value={row.value} onChange={e=>upd(i,"value",e.target.value)}/>
-                    <select style={{background:"#0A0F1C",border:"1px solid #1E2D45",borderRadius:8,padding:"8px 5px",fontSize:11,color:C.text,cursor:"pointer",fontFamily:"'Outfit',sans-serif"}} value={row.sector} onChange={e=>upd(i,"sector",e.target.value)}>
+                    <input style={{background:"#0A0F1C",border:"1px solid #1E2D45",borderRadius:8,padding:"8px 8px",fontSize:12,color:C.text,fontFamily:"'Outfit',sans-serif",width:"100%"}} placeholder="182000" type="number" value={row.value} onChange={e=>upd(i,"value",e.target.value)} title="Current market value in ₹"/>
+                    <div>
+                      <input style={{background:"#0A0F1C",border:"1px solid #1E2D45",borderRadius:8,padding:"8px 8px",fontSize:12,color:C.text,fontFamily:"'Outfit',sans-serif",width:"100%"}} placeholder="156.40" type="number" step="0.01" value={row.buyPrice} onChange={e=>upd(i,"buyPrice",e.target.value)} title="Average buy price per unit/share"/>
+                      <div style={{fontSize:9,color:C.textDim,marginTop:2}}>avg buy price</div>
+                    </div>
+                    <div>
+                      <input style={{background:"#0A0F1C",border:"1px solid #1E2D45",borderRadius:8,padding:"8px 8px",fontSize:12,color:C.text,fontFamily:"'Outfit',sans-serif",width:"100%"}} placeholder="120.5" type="number" step="0.001" value={row.units} onChange={e=>upd(i,"units",e.target.value)} title="Number of units or shares held"/>
+                      <div style={{fontSize:9,color:C.textDim,marginTop:2}}>units held</div>
+                    </div>
+                    <select style={{background:"#0A0F1C",border:"1px solid #1E2D45",borderRadius:8,padding:"8px 4px",fontSize:11,color:C.text,cursor:"pointer",fontFamily:"'Outfit',sans-serif"}} value={row.sector} onChange={e=>upd(i,"sector",e.target.value)}>
                       <option value="">Sector</option>
                       {SECTORS.map(s=><option key={s} value={s}>{s}</option>)}
                     </select>
-                    <input style={{background:"#0A0F1C",border:"1px solid #1E2D45",borderRadius:8,padding:"8px 6px",fontSize:12,color:C.text,fontFamily:"'Outfit',sans-serif",width:"100%"}} placeholder="0.89" type="number" step="0.01" value={row.expRatio} onChange={e=>upd(i,"expRatio",e.target.value)}/>
-                    <button onClick={()=>delRow(i)} style={{background:"transparent",border:"none",color:C.textDim,cursor:"pointer",fontSize:17,lineHeight:1,padding:0,fontFamily:"sans-serif"}}>×</button>
+                    <input style={{background:"#0A0F1C",border:"1px solid #1E2D45",borderRadius:8,padding:"8px 6px",fontSize:12,color:C.text,fontFamily:"'Outfit',sans-serif",width:"100%"}} placeholder="0.89" type="number" step="0.01" value={row.expRatio} onChange={e=>upd(i,"expRatio",e.target.value)} title="Annual expense ratio % — find this on Value Research or AMFI"/>
+                    <button onClick={()=>delRow(i)} style={{background:"transparent",border:"none",color:C.textDim,cursor:"pointer",fontSize:17,lineHeight:1,padding:0,fontFamily:"sans-serif"}} aria-label="Remove holding">×</button>
                   </div>
                 ))}
               </div>
 
-              <button onClick={addRow} style={{width:"100%",background:"transparent",border:`1px dashed ${C.borderMd}`,borderRadius:8,padding:"7px",fontSize:12,color:C.textSub,cursor:"pointer",fontFamily:"'Outfit',sans-serif",marginBottom:16}}>
+              <button onClick={addRow} style={{width:"100%",background:"transparent",border:`1px dashed ${C.borderMd}`,borderRadius:8,padding:"7px",fontSize:12,color:C.textSub,cursor:"pointer",fontFamily:"'Outfit',sans-serif",marginBottom:10}}>
                 + Add another holding
               </button>
+              <div style={{background:C.surface,borderRadius:8,padding:"9px 12px",marginBottom:14,fontSize:11,color:C.textSub,lineHeight:1.7}}>
+                💡 <strong style={{color:C.gold}}>Buy price + units</strong> = RAYR calculates your real gain/loss. Skip them to just see portfolio structure. <strong style={{color:C.textSub}}>Expense ratio</strong> = annual fee % charged by the fund — find it on <a href="https://www.valueresearchonline.com" target="_blank" rel="noreferrer" style={{color:C.teal}}>Value Research</a>.
+              </div>
 
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9,marginBottom:11}}>
                 <button onClick={()=>setStep(2)} style={{background:C.surface,border:`1px solid ${C.borderMd}`,borderRadius:10,padding:"11px",fontSize:12,color:C.textSub,fontFamily:"'Outfit',sans-serif",cursor:"pointer"}}>← Back</button>
@@ -605,7 +646,7 @@ const Dashboard = ({ P, user, setPage, blurred }) => {
       <div className="fu1 stat-grid" style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:18}}>
         {[
           {l:"Portfolio Value",v:<span className={blurred?"blur-target":""}>{fmtK(P.total)}</span>,sub:P.isDemo?"Sample data":"Your holdings",c:C.gold,icon:"💼"},
-          {l:"Estimated Gain",v:<span className={blurred?"blur-target":""}>+{fmtK(P.gain)}</span>,sub:`+${P.gainPct}% growth`,c:C.green,icon:"📈"},
+          {l:"Estimated Gain",v:P.hasRealCost&&P.gain!=null?<span className={blurred?"blur-target":""}>{P.gain>=0?"+":""}{fmtK(P.gain)}</span>:<span style={{fontSize:12,color:C.textSub}}>Add buy price →</span>,sub:P.hasRealCost&&P.gainPct!=null?`${P.gainPct>=0?"+":""}${P.gainPct}% real return`:"Enter buy price for real gain",c:P.hasRealCost&&P.gain!=null?(P.gain>=0?C.green:C.red):C.textSub,icon:"📈"},
           {l:"Monthly SIP",v:<span className={blurred?"blur-target":""}>{fmt(user.monthlySIP)}</span>,sub:"Compounding monthly",c:C.teal,icon:"↻"},
           {l:"Health Score",v:`${P.healthScore}/100`,sub:P.healthLabel,c:P.healthScore>=70?C.green:P.healthScore>=55?C.amber:C.red,icon:"♥"},
         ].map((s,i) => (
@@ -1449,6 +1490,7 @@ export default function App() {
   };
 
   return (
+    <ErrorBoundary>
     <div className={blurred?"blur-nums":""} style={{minHeight:"100vh",background:C.bg,display:"flex"}}>
       <GS/>
       <Toasts/>
@@ -1492,6 +1534,7 @@ export default function App() {
             const isA = page===item.id;
             return (
               <div key={item.id} onClick={()=>setPage(item.id)} className="ni"
+                role="button" aria-label={item.label} aria-current={isA?"page":undefined}
                 style={{display:"flex",alignItems:"center",gap:9,padding:"8px 9px",borderRadius:9,cursor:"pointer",background:isA?C.goldDim:"transparent",border:`1px solid ${isA?C.gold+"35":"transparent"}`,marginBottom:1}}>
                 <span style={{fontSize:12,color:isA?C.gold:C.textSub,width:15,textAlign:"center",flexShrink:0}}>{item.icon}</span>
                 <div style={{overflow:"hidden"}}>
@@ -1542,5 +1585,6 @@ export default function App() {
         })}
       </nav>
     </div>
+    </ErrorBoundary>
   );
 }
