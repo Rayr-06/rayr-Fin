@@ -7,6 +7,43 @@ import {
 } from "recharts";
 
 /* ═══════════════════════════════════════════════════════
+   NAMED CONSTANTS — no magic numbers
+═══════════════════════════════════════════════════════ */
+const APP_VERSION = "2.1.0";
+const RETURNS = { conservative:0.08, moderate:0.12, aggressive:0.16, fd:0.07 };
+const HEALTH_THRESHOLDS = { good:70, fair:55 };
+const HIGH_TER_THRESHOLD = 1.5;
+
+/* ═══════════════════════════════════════════════════════
+   XIRR — real return calc (Newton-Raphson)
+   Pass [{amount: -invested (negative), date: Date},
+         {amount: +currentValue, date: new Date()}]
+═══════════════════════════════════════════════════════ */
+function calcXIRR(cashflows, guess = 0.1) {
+  if (!cashflows || cashflows.length < 2) return null;
+  const t0 = cashflows[0].date.getTime();
+  const cf = cashflows.map(c => ({
+    v: c.amount,
+    t: (c.date.getTime() - t0) / (365.25 * 24 * 3600 * 1000)
+  }));
+  let rate = guess;
+  for (let i = 0; i < 500; i++) {
+    let f = 0, df = 0;
+    for (const { v, t } of cf) {
+      const p = Math.pow(1 + rate, t);
+      f += v / p;
+      df -= t * v / ((1 + rate) * p);
+    }
+    if (Math.abs(df) < 1e-12) break;
+    const nr = rate - f / df;
+    if (Math.abs(nr - rate) < 1e-6) return +(nr * 100).toFixed(1);
+    rate = nr;
+    if (rate <= -1) rate = -0.9999;
+  }
+  return null;
+}
+
+/* ═══════════════════════════════════════════════════════
    THEME
 ═══════════════════════════════════════════════════════ */
 const C = {
@@ -38,6 +75,7 @@ const GS = () => (
     @keyframes toastIn{0%{opacity:0;transform:translateX(110%)}8%{opacity:1;transform:translateX(0)}88%{opacity:1;transform:translateX(0)}100%{opacity:0;transform:translateX(110%)}}
     @keyframes spin{to{transform:rotate(360deg)}}
     @keyframes shimmer{0%,100%{opacity:0.4}50%{opacity:1}}
+    @keyframes successPop{0%{transform:scale(1)}50%{transform:scale(1.08)}100%{transform:scale(1)}}
     .fu{animation:fadeUp 0.38s ease both}
     .fu1{animation:fadeUp 0.38s 0.07s ease both}
     .fu2{animation:fadeUp 0.38s 0.14s ease both}
@@ -47,11 +85,15 @@ const GS = () => (
     .ch{transition:transform 0.18s,box-shadow 0.18s,border-color 0.18s}
     .ni{transition:all 0.14s}
     .ni:hover{background:rgba(212,167,85,0.07)!important}
-    input:focus,select:focus,textarea:focus{outline:none;border-color:#D4A755!important;box-shadow:0 0 0 2px rgba(212,167,85,0.14)}
+    input:focus,select:focus,textarea:focus,button:focus-visible{outline:none;border-color:#D4A755!important;box-shadow:0 0 0 3px rgba(212,167,85,0.25)!important}
+    :focus-visible{outline:2px solid #D4A755;outline-offset:2px}
     input[type=number]::-webkit-inner-spin-button{opacity:0.3}
     input[type=range]{accent-color:#D4A755}
     .blur-nums .blur-target{filter:blur(8px);transition:filter 0.2s}
     option{background:#0D1422;color:#E4E8F2}
+    button{cursor:pointer}
+    .skip-link{position:absolute;top:-60px;left:16px;background:#D4A755;color:#06080F;padding:8px 16px;border-radius:6px;font-size:13px;font-weight:600;z-index:9999;transition:top 0.2s;font-family:'Outfit',sans-serif}
+    .skip-link:focus{top:16px}
     @media(max-width:768px){
       .sidebar-desktop{display:none!important}
       .main-padded{margin-left:0!important;padding:20px 14px 88px!important;width:100vw!important;box-sizing:border-box!important}
@@ -59,6 +101,8 @@ const GS = () => (
       .page-grid-2{grid-template-columns:1fr!important}
       .stat-grid{grid-template-columns:1fr 1fr!important}
       .content-inner{max-width:100%!important}
+      .holdings-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+      .onboard-row{grid-template-columns:1fr!important}
     }
     @media(min-width:769px){
       .mobile-nav{display:none!important}
@@ -67,6 +111,9 @@ const GS = () => (
     }
     @media(min-width:1400px){
       .content-inner{max-width:1200px}
+    }
+    @media(prefers-reduced-motion:reduce){
+      .fu,.fu1,.fu2,.fu3,.sc,.ch{animation:none!important;transition:none!important}
     }
   `}</style>
 );
@@ -274,13 +321,25 @@ function buildPortfolio(holdings, sip) {
     { s:"Concentration", you:maxW<25?85:maxW<35?60:35, ideal:70 },
     { s:"Return quality", you:68, ideal:70 },
   ];
-  const recs = [];
+  // XIRR calculation - if purchase dates and buy prices available
+  const xirr_val = (() => {
+    const withDates = rows.filter(h => h.purchaseDate && h.buyPrice > 0 && h.units > 0);
+    if (withDates.length === 0) return null;
+    const flows = withDates.flatMap(h => ([
+      { amount: -(h.buyPrice * h.units), date: new Date(h.purchaseDate) },
+    ]));
+    flows.push({ amount: total, date: new Date() });
+    return calcXIRR(flows);
+  })();
+
+  // Expense drag: annual fee cost in rupees
+  const expenseDragRs = avgEx > 0 ? Math.round(total * avgEx / 100) : 0;
   if (!hasD) recs.push({ p:"High", action:"Add a debt fund", detail:"You have zero debt. When equity drops 25%, debt drops 1–2%. That cushion stops panic-selling — the #1 wealth destroyer.", impact:`₹${Math.round(total*0.15).toLocaleString("en-IN")} at 15% target` });
   if (maxW > 30 && topHolding) recs.push({ p:"High", action:`Trim ${topHolding.name}`, detail:`At ${maxW.toFixed(0)}% weight, one bad quarter hits you disproportionately. Target under 20%.`, impact:`Reduce by ₹${Math.round(total*(maxW-20)/100).toLocaleString("en-IN")}` });
   if (nS < 4) recs.push({ p:"Medium", action:"Add more sectors", detail:`Only ${nS} sector(s). A single sector event moves your entire portfolio. Target 5–7 distinct sectors.`, impact:"Lower sector risk" });
   if (avgEx > 1.0) recs.push({ p:"Low", action:"Switch to direct plans", detail:`Blended expense ratio: ${avgEx.toFixed(2)}%. Direct plans are 0.5–0.7% cheaper. On ₹${Math.round(total/100000).toFixed(0)}L portfolio that is real money.`, impact:`~₹${Math.round(total*(avgEx-0.75)/100).toLocaleString("en-IN")}/yr saved` });
   if (recs.length === 0) recs.push({ p:"Good", action:"Portfolio is well-structured", detail:"You have good diversification, a debt cushion, and reasonable costs. Keep SIPs running and review annually.", impact:"Stay the course" });
-  return { rows, total, invested: totalCost ? +totalCost.toFixed(0) : null, gain, gainPct, hasRealCost, healthScore:sc, healthLabel, sectorData, assetData, sipData, projData, stressData, radarData, recs, nH, avgEx, hasD, maxW, isDemo:false };
+  return { rows, total, invested: totalCost ? +totalCost.toFixed(0) : null, gain, gainPct, hasRealCost, xirr: xirr_val, expenseDragRs, healthScore:sc, healthLabel, sectorData, assetData, sipData, projData, stressData, radarData, recs, nH, avgEx, hasD, maxW, isDemo:false };
 }
 
 /* Demo portfolio */
@@ -637,8 +696,15 @@ const Dashboard = ({ P, user, setPage, blurred }) => {
 
       {/* FD comparison banner — the Indian user's #1 question */}
       {!P.isDemo && extra > 0 && (
-        <div className="fu" style={{background:"rgba(34,197,94,0.06)",border:"1px solid rgba(34,197,94,0.25)",borderRadius:10,padding:"10px 16px",marginBottom:18,fontSize:12,color:C.green,lineHeight:1.6}}>
+        <div className="fu" role="note" aria-label="Fixed deposit comparison" style={{background:"rgba(34,197,94,0.06)",border:"1px solid rgba(34,197,94,0.25)",borderRadius:10,padding:"10px 16px",marginBottom:12,fontSize:12,color:C.green,lineHeight:1.6}}>
           📊 <strong>vs Fixed Deposit:</strong> At 12% CAGR your SIP of {fmt(user.monthlySIP)} creates <span className={blurred?"blur-target":""}>{fmtK(extra)}</span> more wealth than a 7% FD over 10 years. RAYR shows you how to protect that gap.
+        </div>
+      )}
+
+      {/* Expense drag warning */}
+      {P.expenseDragRs > 0 && (
+        <div className="fu" role="note" aria-label="Expense ratio cost warning" style={{background:"rgba(245,158,11,0.06)",border:"1px solid rgba(245,158,11,0.22)",borderRadius:10,padding:"10px 16px",marginBottom:18,fontSize:12,color:C.amber,lineHeight:1.6}}>
+          💸 <strong>Expense drag:</strong> Your funds charge <span className={blurred?"blur-target":""}>{fmtK(P.expenseDragRs)}</span>/year in management fees (avg {P.avgEx.toFixed(2)}% TER). Switching to direct plans could save ~{fmtK(Math.round(P.expenseDragRs*0.4))}/year.
         </div>
       )}
 
@@ -646,7 +712,7 @@ const Dashboard = ({ P, user, setPage, blurred }) => {
       <div className="fu1 stat-grid" style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:18}}>
         {[
           {l:"Portfolio Value",v:<span className={blurred?"blur-target":""}>{fmtK(P.total)}</span>,sub:P.isDemo?"Sample data":"Your holdings",c:C.gold,icon:"💼"},
-          {l:"Estimated Gain",v:P.hasRealCost&&P.gain!=null?<span className={blurred?"blur-target":""}>{P.gain>=0?"+":""}{fmtK(P.gain)}</span>:<span style={{fontSize:12,color:C.textSub}}>Add buy price →</span>,sub:P.hasRealCost&&P.gainPct!=null?`${P.gainPct>=0?"+":""}${P.gainPct}% real return`:"Enter buy price for real gain",c:P.hasRealCost&&P.gain!=null?(P.gain>=0?C.green:C.red):C.textSub,icon:"📈"},
+          {l:"Actual Return",v:P.xirr!=null?<span className={blurred?"blur-target":""}>{P.xirr>=0?"+":""}{P.xirr}% XIRR</span>:P.hasRealCost&&P.gain!=null?<span className={blurred?"blur-target":""}>{P.gain>=0?"+":""}{fmtK(P.gain)}</span>:<span style={{fontSize:12,color:C.textSub}}>Add buy price →</span>,sub:P.xirr!=null?"Annualised real return":P.hasRealCost&&P.gainPct!=null?`${P.gainPct>=0?"+":""}${P.gainPct}% total gain`:"Enter buy price + date for XIRR",c:P.xirr!=null?(P.xirr>=0?C.green:C.red):P.hasRealCost&&P.gain!=null?(P.gain>=0?C.green:C.red):C.textSub,icon:"📈"},
           {l:"Monthly SIP",v:<span className={blurred?"blur-target":""}>{fmt(user.monthlySIP)}</span>,sub:"Compounding monthly",c:C.teal,icon:"↻"},
           {l:"Health Score",v:`${P.healthScore}/100`,sub:P.healthLabel,c:P.healthScore>=70?C.green:P.healthScore>=55?C.amber:C.red,icon:"♥"},
         ].map((s,i) => (
@@ -718,7 +784,7 @@ const Dashboard = ({ P, user, setPage, blurred }) => {
             <tbody>
               {P.rows.map((h,i) => (
                 <tr key={i} style={{borderBottom:`1px solid ${C.border}`}}>
-                  <td style={{padding:"11px 14px 11px 0",fontSize:12,color:C.text,fontWeight:500}}>{h.name}{h.liveNav&&<span style={{fontSize:9,color:C.teal,marginLeft:6}}>LIVE</span>}</td>
+                  <td style={{padding:"11px 14px 11px 0",fontSize:12,color:C.text,fontWeight:500}}>{h.name}{h.liveNav&&<span style={{fontSize:9,color:C.teal,marginLeft:6}} title={`Live NAV: ₹${h.liveNav} · AMFI data as of today`}>LIVE ✓</span>}</td>
                   <td style={{padding:"11px 14px 11px 0"}}><span style={{background:C.goldDim,color:C.gold,border:`1px solid ${C.gold}25`,borderRadius:4,padding:"2px 7px",fontSize:10}}>{h.type}</span></td>
                   <td style={{padding:"11px 14px 11px 0",fontSize:13,color:C.text,fontFamily:"'Cormorant Garamond',serif",fontWeight:600}} className={blurred?"blur-target":""}>{fmt(h.value)}</td>
                   <td style={{padding:"11px 14px 11px 0",minWidth:90}}>
@@ -1216,11 +1282,12 @@ Keep replies under 5 sentences. Be specific to their portfolio. Never say "I can
     setMsgs(m => [...m, {role:"user",content:q}]);
     setInput("");
     setTyping(true);
+    const SEBI_SUFFIX = "\n\n⚠️ *Not SEBI-registered investment advice. Consult a SEBI-registered advisor before acting on any suggestion.*";
     try {
       if (groqKey) {
         const history = msgs.map(m => ({role:m.role,content:m.content}));
         const reply = await Groq.chat(groqKey, [...history, {role:"user",content:q}], SYSTEM);
-        setMsgs(m => [...m, {role:"assistant",content:reply}]);
+        setMsgs(m => [...m, {role:"assistant",content:reply + SEBI_SUFFIX}]);
       } else {
         await new Promise(r => setTimeout(r, 900 + Math.random()*600));
         const lower = q.toLowerCase();
@@ -1228,7 +1295,7 @@ Keep replies under 5 sentences. Be specific to their portfolio. Never say "I can
         if (/risk|danger|crash|worst/i.test(lower))   reply = FALLBACK["biggest risk"];
         else if (/fee|cost|expense|ratio/i.test(lower)) reply = FALLBACK["fee"];
         else if (/fd|fixed deposit|compare|better/i.test(lower)) reply = FALLBACK["fd"];
-        setMsgs(m => [...m, {role:"assistant",content:reply}]);
+        setMsgs(m => [...m, {role:"assistant",content:reply + SEBI_SUFFIX}]);
         if (!groqKey && msgs.length === 1) {
           setTimeout(() => toast("Add your Groq API key in Settings for real AI answers", "info"), 1200);
         }
@@ -1494,12 +1561,14 @@ export default function App() {
     <div className={blurred?"blur-nums":""} style={{minHeight:"100vh",background:C.bg,display:"flex"}}>
       <GS/>
       <Toasts/>
+      <a href="#main-content" className="skip-link">Skip to main content</a>
 
       {/* ── DESKTOP SIDEBAR ── */}
-      <aside className="sidebar-desktop" style={{width:230,minHeight:"100vh",background:C.surface,borderRight:`1px solid ${C.border}`,display:"flex",flexDirection:"column",position:"fixed",top:0,left:0,zIndex:100}}>
+      <aside className="sidebar-desktop" aria-label="Main navigation" style={{width:230,minHeight:"100vh",background:C.surface,borderRight:`1px solid ${C.border}`,display:"flex",flexDirection:"column",position:"fixed",top:0,left:0,zIndex:100}}>
         <div style={{padding:"20px 18px 16px",borderBottom:`1px solid ${C.border}`}}>
           <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:25,fontWeight:700,color:C.gold,letterSpacing:"-0.03em"}}>RAYR</div>
           <div style={{fontSize:9,color:C.textDim,letterSpacing:"0.15em",marginTop:2,textTransform:"uppercase"}}>Portfolio Intelligence</div>
+          <div style={{fontSize:9,color:C.textDim,marginTop:1}}>v{APP_VERSION}</div>
         </div>
 
         {/* User card */}
@@ -1556,7 +1625,7 @@ export default function App() {
       </aside>
 
       {/* ── MAIN CONTENT ── */}
-      <main className="main-padded" style={{flex:1,padding:"32px 36px",minHeight:"100vh"}}>
+      <main id="main-content" className="main-padded" role="main" aria-label="Portfolio content" style={{flex:1,padding:"32px 36px",minHeight:"100vh"}}>
         <div className="content-inner">
         {isDemo && <DemoBanner onReset={()=>{setSession(null);setPage("dashboard");}}/>}
         <div key={page} className="sc">
