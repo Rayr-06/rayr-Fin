@@ -1,11 +1,11 @@
 ﻿from fastapi import FastAPI
 
-app = FastAPI(title='RAYR API')
+app = FastAPI()
 
-@app.get('/')
+@app.get("/")
 def root():
-return {'status':'running'}
+    return {"status": "RAYR API running"}
 
-@app.get('/api/ping')
-def ping():
-return {'status':'ok'}
+@app.get("/health")
+def health():
+    return {"health": "ok"}
