@@ -1,0 +1,240 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAYR – AI Portfolio Intelligence Engine</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; background: #f9fafc; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+        header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 4rem 0; text-align: center; border-radius: 0 0 2rem 2rem; margin-bottom: 3rem; }
+        h1 { font-size: 3rem; margin-bottom: 1rem; }
+        .subhead { font-size: 1.5rem; opacity: 0.9; max-width: 700px; margin: 0 auto; }
+        .tagline { font-size: 1.2rem; font-style: italic; margin-top: 1rem; background: rgba(255,255,255,0.2); display: inline-block; padding: 0.5rem 1.5rem; border-radius: 50px; }
+        .card { background: white; border-radius: 1rem; padding: 2rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 2rem; }
+        h2 { font-size: 2rem; color: #2d3748; margin-bottom: 1.5rem; border-bottom: 3px solid #667eea; padding-bottom: 0.5rem; display: inline-block; }
+        table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid #e2e8f0; }
+        th { background: #f7fafc; font-weight: 600; }
+        .feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin: 2rem 0; }
+        .feature-item { background: #f7fafc; padding: 1.5rem; border-radius: 0.75rem; border-left: 4px solid #667eea; }
+        .tech-stack { display: flex; flex-wrap: wrap; gap: 1rem; margin: 1.5rem 0; }
+        .tech-badge { background: #edf2f7; padding: 0.5rem 1rem; border-radius: 50px; font-size: 0.9rem; font-weight: 500; }
+        .btn { display: inline-block; background: #667eea; color: white; padding: 0.75rem 1.5rem; border-radius: 50px; text-decoration: none; font-weight: 600; transition: background 0.3s; }
+        .btn:hover { background: #5a67d8; }
+        .btn-outline { background: transparent; border: 2px solid #667eea; color: #667eea; }
+        .btn-outline:hover { background: #667eea; color: white; }
+        footer { text-align: center; padding: 2rem; color: #718096; border-top: 1px solid #e2e8f0; margin-top: 3rem; }
+        .architecture { background: #1a202c; color: #cbd5e0; padding: 2rem; border-radius: 1rem; font-family: monospace; white-space: pre; overflow-x: auto; }
+        .note { background: #fff3cd; border-left: 4px solid #ffc107; padding: 1rem; border-radius: 0.5rem; margin: 1rem 0; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>RAYR – AI Portfolio Intelligence Engine</h1>
+            <p class="subhead">Your portfolio deserves a doctor, not a chart.</p>
+            <p class="tagline">Diagnose weaknesses, understand risks, make better decisions.</p>
+            <div style="margin-top: 2rem;">
+                <a href="#" class="btn">Launch Demo</a>
+                <a href="https://github.com/Rayr-06/rayr-Fin" class="btn btn-outline" style="margin-left: 1rem;">View on GitHub</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <section class="card">
+            <h2>What RAYR Does</h2>
+            <p>Most Indian investors stare at their Zerodha or Groww dashboard at 11pm wondering “Am I doing this right?” RAYR answers that question — clearly, honestly, and without jargon.</p>
+            <table>
+                <thead><tr><th>Feature</th><th>What it tells you</th></tr></thead>
+                <tbody>
+                    <tr><td>Portfolio Health Score</td><td>A single 0–100 score across 6 dimensions</td></tr>
+                    <tr><td>Exposure Map</td><td>Exactly where your money is — sector, asset class, market cap</td></tr>
+                    <tr><td>Fund Overlap Detector</td><td>Which funds share the same stocks (and what it costs you)</td></tr>
+                    <tr><td>Risk Simulator</td><td>What happens to your ₹ if Nifty crashes 20%</td></tr>
+                    <tr><td>Tax Planner</td><td>When to sell to save on STCG vs LTCG tax</td></tr>
+                    <tr><td>SIP Tracker</td><td>20-year projection at 3 return scenarios</td></tr>
+                    <tr><td>Goal Tracker</td><td>Are you on track for home / retirement / education?</td></tr>
+                    <tr><td>News For You</td><td>Only news that affects your actual holdings</td></tr>
+                    <tr><td>Optimizer</td><td>Specific actions to improve your score</td></tr>
+                    <tr><td>Dr. RAYR</td><td>Ask anything — plain English AI advisor</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="card">
+            <h2>Architecture</h2>
+            <div class="architecture">
+┌─────────────────────────────────────────────────┐
+│                 Experience Layer                 │
+│         rayr-ui  (Vite + React + Recharts)       │
+└──────────────────────┬──────────────────────────┘
+                       │ REST API
+┌──────────────────────▼──────────────────────────┐
+│                  Insight Engine                  │
+│         rayr-api  (FastAPI + Python)             │
+│   /insights  /chat  /news  /optimize             │
+└──────────────────────┬──────────────────────────┘
+                       │
+┌──────────────────────▼──────────────────────────┐
+│                Analytics Engine                  │
+│              rayr-engine  (Python)               │
+│  portfolio_analyzer  risk_engine  overlap_       │
+│  detector  optimizer  simulation_engine          │
+└──────────────────────┬──────────────────────────┘
+                       │
+┌──────────────────────▼──────────────────────────┐
+│                   Data Layer                     │
+│      mftool (AMFI NAV)  yfinance (NSE/BSE)       │
+│      AMFI holdings API  RBI rate feeds           │
+└─────────────────────────────────────────────────┘
+            </div>
+        </section>
+
+        <section class="card">
+            <h2>Tech Stack — 100% Free & Open Source</h2>
+            <div class="tech-stack">
+                <span class="tech-badge">Vite + React 18</span>
+                <span class="tech-badge">Recharts</span>
+                <span class="tech-badge">FastAPI</span>
+                <span class="tech-badge">mftool</span>
+                <span class="tech-badge">yfinance</span>
+                <span class="tech-badge">pandas + numpy</span>
+                <span class="tech-badge">Claude API</span>
+                <span class="tech-badge">Railway.app</span>
+                <span class="tech-badge">MongoDB Atlas</span>
+            </div>
+            <table>
+                <thead><tr><th>Layer</th><th>Tool</th><th>Why</th></tr></thead>
+                <tbody>
+                    <tr><td>Frontend</td><td>Vite + React 18</td><td>Fast, modern, HMR</td></tr>
+                    <tr><td>Charts</td><td>Recharts</td><td>Beautiful financial charts</td></tr>
+                    <tr><td>Backend</td><td>FastAPI (Python)</td><td>Auto-docs, typed, fast</td></tr>
+                    <tr><td>MF Data</td><td>mftool</td><td>Free AMFI NAV + holdings</td></tr>
+                    <tr><td>Market Data</td><td>yfinance</td><td>Free NSE/BSE prices</td></tr>
+                    <tr><td>Analytics</td><td>pandas + numpy</td><td>Institutional-grade math</td></tr>
+                    <tr><td>AI Advisor</td><td>Claude API (Anthropic)</td><td>Best-in-class LLM</td></tr>
+                    <tr><td>Hosting</td><td>Railway.app free tier</td><td>/month to start</td></tr>
+                    <tr><td>Database</td><td>MongoDB Atlas free</td><td>512MB free tier</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="card">
+            <h2>Project Structure</h2>
+            <pre style="background:#1a202c; color:#cbd5e0; padding:1rem; border-radius:0.5rem; overflow-x:auto;">
+rayr/
+├── rayr-ui/                  ← Frontend (Vite + React)
+│   ├── src/
+│   │   ├── App.jsx           ← Full 12-section application
+│   │   ├── main.jsx
+│   │   └── index.css
+│   ├── package.json
+│   ├── vite.config.js
+│   └── index.html
+│
+├── rayr-api/                 ← Backend (FastAPI)
+│   ├── main.py               ← All API endpoints
+│   ├── requirements.txt
+│   └── Dockerfile
+│
+├── rayr-engine/              ← Analytics Engine (Python)
+│   ├── portfolio_analyzer.py
+│   ├── risk_engine.py
+│   ├── overlap_detector.py
+│   └── optimizer.py
+│
+├── demo/                     ← GitHub Pages landing page
+│   └── index.html
+│
+├── docs/
+│   └── ARCHITECTURE.md
+│
+├── SETUP.ps1
+├── start.ps1
+├── docker-compose.yml
+└── README.md
+            </pre>
+        </section>
+
+        <section class="card">
+            <h2>Quick Start</h2>
+            <p><strong>Windows (One Command):</strong></p>
+            <pre style="background:#1a202c; color:#cbd5e0; padding:1rem; border-radius:0.5rem;">.\SETUP.ps1
+.\start.ps1</pre>
+            <p><strong>Manual Start:</strong></p>
+            <pre style="background:#1a202c; color:#cbd5e0; padding:1rem; border-radius:0.5rem;"># Terminal 1 — Backend API
+cd rayr-api
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+python main.py
+
+# Terminal 2 — Frontend
+cd rayr-ui
+npm install
+npm run dev</pre>
+        </section>
+
+        <section class="card">
+            <h2>API Endpoints</h2>
+            <table>
+                <thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td>GET</td><td>/api/portfolio/demo</td><td>Demo portfolio data</td></tr>
+                    <tr><td>POST</td><td>/api/portfolio/analyze</td><td>Analyze a custom portfolio</td></tr>
+                    <tr><td>GET</td><td>/api/analytics/health/{id}</td><td>Health score + breakdown</td></tr>
+                    <tr><td>GET</td><td>/api/analytics/exposure/{id}</td><td>Sector + asset exposure map</td></tr>
+                    <tr><td>GET</td><td>/api/analytics/overlap/{id}</td><td>Fund overlap detection</td></tr>
+                    <tr><td>POST</td><td>/api/analytics/stress-test</td><td>Market scenario simulation</td></tr>
+                    <tr><td>GET</td><td>/api/analytics/tax/{id}</td><td>Tax optimization plan</td></tr>
+                    <tr><td>GET</td><td>/api/analytics/optimize/{id}</td><td>Portfolio recommendations</td></tr>
+                    <tr><td>GET</td><td>/api/analytics/sip/{id}</td><td>SIP projection (20 years)</td></tr>
+                    <tr><td>GET</td><td>/api/insights/{id}</td><td>AI-generated insights</td></tr>
+                    <tr><td>POST</td><td>/api/insights/chat</td><td>Dr. RAYR chat advisor</td></tr>
+                    <tr><td>GET</td><td>/api/news/{id}</td><td>Portfolio-relevant news</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="card">
+            <h2>Data Sources & Transparency</h2>
+            <table>
+                <thead><tr><th>Data</th><th>Source</th><th>Cost</th></tr></thead>
+                <tbody>
+                    <tr><td>Mutual Fund NAV</td><td>AMFI via mftool</td><td>Free</td></tr>
+                    <tr><td>Stock/ETF Prices</td><td>NSE via yfinance</td><td>Free</td></tr>
+                    <tr><td>Fund Holdings</td><td>AMFI monthly disclosure</td><td>Free</td></tr>
+                    <tr><td>Interest Rates</td><td>RBI website</td><td>Free</td></tr>
+                    <tr><td>Sector Classification</td><td>NSE/SEBI</td><td>Free</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="card">
+            <h2>Roadmap</h2>
+            <ul style="margin-left:2rem;">
+                <li><strong>Phase 1 — Foundation:</strong> Portfolio ingestion, exposure analysis, basic analytics</li>
+                <li><strong>Phase 2 — Risk Intelligence:</strong> Volatility, correlation, diversification score</li>
+                <li><strong>Phase 3 — Scenario Analysis:</strong> Crash simulations, economic event modeling</li>
+                <li><strong>Phase 4 — Optimization:</strong> Improvement suggestions, rebalancing logic</li>
+                <li><strong>Phase 5 — AI Insight Layer:</strong> Live Claude API integration with portfolio context</li>
+                <li><strong>Phase 6 — Live Data:</strong> Full mftool + yfinance integration replacing mock data</li>
+                <li><strong>Phase 7 — Auth + Profiles:</strong> User accounts, portfolio persistence</li>
+                <li><strong>Phase 8 — Mobile:</strong> React Native app</li>
+            </ul>
+        </section>
+
+        <div class="note">
+            <strong>Note:</strong> RAYR is not SEBI registered. This is a portfolio analysis tool, not investment advice.
+        </div>
+    </main>
+
+    <footer>
+        <p>© 2026 RAYR — Built by an Indian investor for Indian investors. MIT Licensed.</p>
+        <p><a href="https://github.com/Rayr-06/rayr-Fin">GitHub</a> | <a href="#">Privacy</a> | <a href="#">Terms</a></p>
+    </footer>
+</body>
+</html>
