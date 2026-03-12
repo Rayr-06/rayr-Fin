@@ -54,14 +54,19 @@ const GS = () => (
     option{background:#0D1422;color:#E4E8F2}
     @media(max-width:768px){
       .sidebar-desktop{display:none!important}
-      .main-padded{margin-left:0!important;padding:20px 16px 80px!important;max-width:100vw!important}
+      .main-padded{margin-left:0!important;padding:20px 14px 88px!important;width:100vw!important;box-sizing:border-box!important}
       .mobile-nav{display:flex!important}
       .page-grid-2{grid-template-columns:1fr!important}
       .stat-grid{grid-template-columns:1fr 1fr!important}
+      .content-inner{max-width:100%!important}
     }
     @media(min-width:769px){
       .mobile-nav{display:none!important}
       .main-padded{margin-left:230px}
+      .content-inner{max-width:1100px;margin:0 auto}
+    }
+    @media(min-width:1400px){
+      .content-inner{max-width:1200px}
     }
   `}</style>
 );
@@ -1509,9 +1514,11 @@ export default function App() {
 
       {/* ── MAIN CONTENT ── */}
       <main className="main-padded" style={{flex:1,padding:"32px 36px",minHeight:"100vh"}}>
+        <div className="content-inner">
         {isDemo && <DemoBanner onReset={()=>{setSession(null);setPage("dashboard");}}/>}
         <div key={page} className="sc">
           {PAGES[page] || <Dashboard P={P} user={user} setPage={setPage} blurred={blurred}/>}
+        </div>
         </div>
       </main>
 
